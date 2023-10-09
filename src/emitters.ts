@@ -1,4 +1,3 @@
-import type { Response } from "undici";
 import type {
     ClientMessage,
     ClientMessageRequest,
@@ -7,9 +6,11 @@ import type {
     ServerConversation,
     ServerPricing,
     ServerError,
-    PostData
+    PostData,
+    WhatsAppAPIFetch
 } from "./types";
 import type WhatsAppAPI from "./index";
+import type { fetch } from "undici";
 
 /**
  * Callback for "sent" event
@@ -59,12 +60,14 @@ export type OnSentArgs = {
  * @public
  * @param args - The arguments object
  */
-export type OnMessage = (args: OnMessageArgs) => unknown;
+export type OnMessage<Fetch extends WhatsAppAPIFetch = typeof fetch> = (
+    args: OnMessageArgs<Fetch>
+) => unknown;
 
 /**
  * @public
  */
-export type OnMessageArgs = {
+export type OnMessageArgs<Fetch extends WhatsAppAPIFetch> = {
     /**
      * The bot's phoneID
      */
@@ -95,7 +98,7 @@ export type OnMessageArgs = {
     reply: (
         response: ClientMessage,
         context?: boolean
-    ) => Promise<ServerMessageResponse | Response>;
+    ) => Promise<ServerMessageResponse | ReturnType<Fetch>>;
     /**
      * The WhatsAppAPI instance that emitted the event
      */

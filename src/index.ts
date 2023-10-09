@@ -14,7 +14,8 @@ import type {
     ServerDeleteQRResponse,
     ServerMediaRetrieveResponse,
     ServerMediaUploadResponse,
-    ServerMediaDeleteResponse
+    ServerMediaDeleteResponse,
+    WhatsAppAPIFetch
 } from "./types";
 import type {
     OnMessage,
@@ -25,14 +26,16 @@ import type {
     OnStatusArgs
 } from "./emitters";
 
-import type { fetch as FetchType, Request, Response, FormData } from "undici";
-import type { subtle as CryptoSubtle } from "node:crypto";
+import type { fetch as FetchType, FormData } from "undici";
+import type { subtle } from "node:crypto";
 import type { Blob } from "node:buffer";
 
 /**
  * The main API Class
  */
-export default class WhatsAppAPI {
+export default class WhatsAppAPI<
+    Fetch extends WhatsAppAPIFetch = typeof FetchType
+> {
     //#region Properties
     /**
      * The API token
@@ -53,11 +56,11 @@ export default class WhatsAppAPI {
     /**
      * The fetch function for the requests
      */
-    private fetch: typeof FetchType;
+    private fetch: Fetch;
     /**
      * The CryptoSubtle library for checking the signatures
      */
-    private subtle?: typeof CryptoSubtle;
+    private subtle?: typeof subtle;
     /**
      * If true, API operations will return the fetch promise instead. Intended for low level debugging.
      */
@@ -84,7 +87,7 @@ export default class WhatsAppAPI {
      * ```
      */
     public on: {
-        message?: OnMessage;
+        message?: OnMessage<Fetch>;
         sent?: OnSent;
         status?: OnStatus;
     } = {};
@@ -113,7 +116,7 @@ export default class WhatsAppAPI {
         parsed = true,
         secure = true,
         ponyfill = {}
-    }: WhatsAppAPIConstructorArguments) {
+    }: WhatsAppAPIConstructorArguments<Fetch>) {
         this.token = token;
         this.secure = !!secure;
 
@@ -206,7 +209,7 @@ export default class WhatsAppAPI {
         to: string,
         message: ClientMessage,
         context?: string
-    ): Promise<ServerMessageResponse | Response> {
+    ): Promise<ServerMessageResponse | ReturnType<Fetch>> {
         const type = message._type;
 
         const request = {
@@ -235,7 +238,7 @@ export default class WhatsAppAPI {
                 },
                 body: JSON.stringify(request)
             }
-        );
+        ) as ReturnType<Fetch>;
 
         const response = this.parsed
             ? ((await (await promise).json()) as ServerMessageResponse)
@@ -339,7 +342,7 @@ export default class WhatsAppAPI {
     async markAsRead(
         phoneID: string,
         messageId: string
-    ): Promise<ServerMarkAsReadResponse | Response> {
+    ): Promise<ServerMarkAsReadResponse | ReturnType<Fetch>> {
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${phoneID}/messages`,
             {
@@ -354,7 +357,7 @@ export default class WhatsAppAPI {
                     message_id: messageId
                 })
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerMarkAsReadResponse>(promise);
     }
@@ -375,7 +378,7 @@ export default class WhatsAppAPI {
         phoneID: string,
         message: string,
         format: "png" | "svg" = "png"
-    ): Promise<ServerCreateQRResponse | Response> {
+    ): Promise<ServerCreateQRResponse | ReturnType<Fetch>> {
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${phoneID}/message_qrdls?generate_qr_image=${format}&prefilled_message=${message}`,
             {
@@ -384,7 +387,7 @@ export default class WhatsAppAPI {
                     Authorization: `Bearer ${this.token}`
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerCreateQRResponse>(promise);
     }
@@ -399,7 +402,7 @@ export default class WhatsAppAPI {
     async retrieveQR(
         phoneID: string,
         id?: string
-    ): Promise<ServerRetrieveQRResponse | Response> {
+    ): Promise<ServerRetrieveQRResponse | ReturnType<Fetch>> {
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${phoneID}/message_qrdls/${
                 id ?? ""
@@ -409,7 +412,7 @@ export default class WhatsAppAPI {
                     Authorization: `Bearer ${this.token}`
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerRetrieveQRResponse>(promise);
     }
@@ -426,7 +429,7 @@ export default class WhatsAppAPI {
         phoneID: string,
         id: string,
         message: string
-    ): Promise<ServerUpdateQRResponse | Response> {
+    ): Promise<ServerUpdateQRResponse | ReturnType<Fetch>> {
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${phoneID}/message_qrdls/${id}?prefilled_message=${message}`,
             {
@@ -435,7 +438,7 @@ export default class WhatsAppAPI {
                     Authorization: `Bearer ${this.token}`
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerUpdateQRResponse>(promise);
     }
@@ -450,7 +453,7 @@ export default class WhatsAppAPI {
     async deleteQR(
         phoneID: string,
         id: string
-    ): Promise<ServerDeleteQRResponse | Response> {
+    ): Promise<ServerDeleteQRResponse | ReturnType<Fetch>> {
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${phoneID}/message_qrdls/${id}`,
             {
@@ -459,7 +462,7 @@ export default class WhatsAppAPI {
                     Authorization: `Bearer ${this.token}`
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerDeleteQRResponse>(promise);
     }
@@ -478,7 +481,7 @@ export default class WhatsAppAPI {
     async retrieveMedia(
         id: string,
         phoneID?: string
-    ): Promise<ServerMediaRetrieveResponse | Response> {
+    ): Promise<ServerMediaRetrieveResponse | ReturnType<Fetch>> {
         const params = phoneID ? `phone_number_id=${phoneID}` : "";
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${id}?${params}`,
@@ -487,7 +490,7 @@ export default class WhatsAppAPI {
                     Authorization: `Bearer ${this.token}`
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerMediaRetrieveResponse>(promise);
     }
@@ -533,7 +536,7 @@ export default class WhatsAppAPI {
         phoneID: string,
         form: unknown,
         check = true
-    ): Promise<ServerMediaUploadResponse | Response> {
+    ): Promise<ServerMediaUploadResponse | ReturnType<Fetch>> {
         if (check) {
             if (
                 !form ||
@@ -604,7 +607,7 @@ export default class WhatsAppAPI {
                     "Content-Type": "multipart/form-data"
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerMediaUploadResponse>(promise);
     }
@@ -630,7 +633,7 @@ export default class WhatsAppAPI {
      * const response = Whatsapp.fetchMedia(url);
      * ```
      */
-    fetchMedia(url: string): Promise<Response> {
+    fetchMedia(url: string): ReturnType<Fetch> {
         // Hacky way to check if the url is valid and throw if invalid
         return this._authenicatedRequest(new URL(url));
     }
@@ -645,7 +648,7 @@ export default class WhatsAppAPI {
     async deleteMedia(
         id: string,
         phoneID?: string
-    ): Promise<ServerMediaDeleteResponse | Response> {
+    ): Promise<ServerMediaDeleteResponse | ReturnType<Fetch>> {
         const params = phoneID ? `phone_number_id=${phoneID}` : "";
         const promise = this.fetch(
             `https://graph.facebook.com/${this.v}/${id}?${params}`,
@@ -655,7 +658,7 @@ export default class WhatsAppAPI {
                     Authorization: `Bearer ${this.token}`
                 }
             }
-        );
+        ) as ReturnType<Fetch>;
 
         return this.getBody<ServerMediaDeleteResponse>(promise);
     }
@@ -773,7 +776,7 @@ export default class WhatsAppAPI {
             const from = contact?.wa_id ?? message.from;
             const name = contact?.profile.name;
 
-            const args: OnMessageArgs = {
+            const args: OnMessageArgs<Fetch> = {
                 phoneID,
                 from,
                 message,
@@ -866,7 +869,7 @@ export default class WhatsAppAPI {
      * @returns The fetch response
      * @throws If url is not specified
      */
-    _authenicatedRequest(url: string | URL | Request): Promise<Response> {
+    _authenicatedRequest(url: string | URL): ReturnType<Fetch> {
         // Keep the check to ensure on runtime that no weird stuff happens
         if (!url) throw new Error("URL must be specified");
 
@@ -874,7 +877,7 @@ export default class WhatsAppAPI {
             headers: {
                 Authorization: `Bearer ${this.token}`
             }
-        });
+        }) as ReturnType<Fetch>;
     }
 
     /**
@@ -884,8 +887,8 @@ export default class WhatsAppAPI {
      * @returns The json body parsed
      */
     private async getBody<T>(
-        promise: Promise<Response>
-    ): Promise<T | Response> {
+        promise: ReturnType<Fetch>
+    ): Promise<T | ReturnType<Fetch>> {
         return this.parsed ? ((await (await promise).json()) as T) : promise;
     }
 

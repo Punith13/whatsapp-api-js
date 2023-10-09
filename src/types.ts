@@ -7,14 +7,28 @@
  * feel free to read the docs :)
  */
 
-import type { fetch as FetchType } from "undici";
-import type { subtle as CryptoSubtle } from "node:crypto";
+import type { FormData } from "undici";
+import type { subtle } from "node:crypto";
 import type { AtLeastOne } from "./utils";
+
+export type WhatsAppAPIFetch = (
+    url: string | URL,
+    options: {
+        method?: string;
+        body?: string | FormData;
+        headers: {
+            Authorization?: string;
+            "Content-Type"?: string;
+        };
+    }
+) => Promise<{
+    json: () => Promise<unknown>;
+}>;
 
 /**
  * The main constructor arguments for the API
  */
-export type TheBasicConstructorArguments = {
+export type TheBasicConstructorArguments<Fetch extends WhatsAppAPIFetch> = {
     /**
      * The API token, given at setup.
      * You must provide an API token to use the framework.
@@ -108,11 +122,11 @@ export type TheBasicConstructorArguments = {
         /**
          * The fetch ponyfill to use for the requests. If not specified, it defaults to the fetch function from the enviroment.
          */
-        fetch?: typeof FetchType;
+        fetch?: Fetch;
         /**
          * The subtle ponyfill to use for the signatures. If not specified, it defaults to crypto.subtle from the enviroment.
          */
-        subtle?: typeof CryptoSubtle;
+        subtle?: typeof subtle;
     };
 };
 
@@ -139,8 +153,8 @@ export type ExtraTypesThatMakeTypescriptWork = SecureLightSwitch;
  *
  * You should absolutely read {@link TheBasicConstructorArguments} in order to use the framework.
  */
-export type WhatsAppAPIConstructorArguments = TheBasicConstructorArguments &
-    ExtraTypesThatMakeTypescriptWork;
+export type WhatsAppAPIConstructorArguments<Fetch extends WhatsAppAPIFetch> =
+    TheBasicConstructorArguments<Fetch> & ExtraTypesThatMakeTypescriptWork;
 
 export abstract class ClientMessage {
     /**
